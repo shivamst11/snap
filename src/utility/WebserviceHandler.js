@@ -2,6 +2,7 @@ import NetInfo from '@react-native-community/netinfo';
 import UploadStore from '../store/UploadStore';
 const axios = require('axios');
 
+//upload progress config
 const Config = progressEvent => {
   const percentCompleted = Math.round(
     (progressEvent.loaded * 100) / progressEvent.total,

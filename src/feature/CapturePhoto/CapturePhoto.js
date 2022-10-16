@@ -19,10 +19,10 @@ import {
   setUpdateIntervalForType,
   SensorTypes,
 } from 'react-native-sensors';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 
 //camera take photo option
 const takePhotoOptions = {
-  photoCodec: 'jpeg',
   qualityPrioritization: 'speed',
   skipMetadata: true,
   quality: 80,
@@ -31,7 +31,7 @@ const takePhotoOptions = {
 //accelerometer time interval in millisecond
 setUpdateIntervalForType(SensorTypes.accelerometer, 500);
 const CapturePhoto = ({navigation, route}) => {
-  //camera selection
+  //camera type select
   const devices = useCameraDevices('wide-angle-camera');
   const device = devices.back;
   const {method, imageName} = route.params;
@@ -54,6 +54,7 @@ const CapturePhoto = ({navigation, route}) => {
   const checkPhonePosition = () => {
     subscription = accelerometer.subscribe(({x, y, z}) => {
       setPhonePosition({x, y, z});
+      //only 20 degree tilt allowed while capturing photo
       if (
         ((x > 2 || x < -2) && (z > 2 || z < -2)) ||
         ((y > 2 || y < -2) && (z > 2 || z < -2))
@@ -89,12 +90,40 @@ const CapturePhoto = ({navigation, route}) => {
         setDisableSnap(true);
         //takeing picture
         const photo = await cameraRef.current.takePhoto(takePhotoOptions);
+        const mainFolder =
+          await `${ReactNativeBlobUtil.fs.dirs.SDCardApplicationDir}/private`;
+        //checking is private directory exist
+        const isExist = await ReactNativeBlobUtil.fs.isDir(mainFolder);
+        if (!isExist) {
+          //creating private directory
+          await ReactNativeBlobUtil.fs
+            .mkdir(mainFolder)
+            .then(() => console.log('folder created'));
+        }
+        const imgId =
+          moment().format('MMDDYYYYhhmmss') + moment().millisecond();
+        //storing image in private directory
+        await ReactNativeBlobUtil.fs.createFile(
+          `${mainFolder}/${imgId}.jpg`,
+          photo.path,
+          'uri',
+        );
+
         if (photo?.path) {
+          ReactNativeBlobUtil.fs
+            .unlink(photo?.path)
+            .then(() => {
+              console.log('cache Removed for image');
+            })
+            .catch(err => {
+              console.warn(err);
+            });
+
           const list = await getAsync(ASYNC_KEYS.IMAGE_PATH_LIST, true);
           //replace case
           if (method === 'replace') {
             const imgDetails = {
-              path: `file://${photo.path}`,
+              path: `file://${mainFolder}/${imgId}.jpg`,
               name: imageName,
             };
             // replacing the picture
@@ -113,9 +142,10 @@ const CapturePhoto = ({navigation, route}) => {
             return;
           }
           const imgDetails = {
-            path: `file://${photo.path}`,
-            name: moment().format('MMDDYYYYhhmmss') + moment().millisecond(), // using moment for photo name
+            path: `file://${mainFolder}/${imgId}.jpg`,
+            name: imgId, // using time for image name
           };
+
           const updateList = [imgDetails, ...(list || [])];
           //saving the updated list in async storage after capture photo
           await setAsync(ASYNC_KEYS.IMAGE_PATH_LIST, updateList);

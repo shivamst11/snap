@@ -10,7 +10,7 @@ import {callRemoteMethod} from '../../utility/WebserviceHandler';
 import {observer} from 'mobx-react-lite';
 import {Store} from '../../store/Stores';
 import CustomLoader from '../../reusable/CustomLoader';
-var RNFS = require('react-native-fs');
+import ReactNativeBlobUtil from 'react-native-blob-util';
 
 const ShowMedia = ({navigation}) => {
   const [imageList, setImageList] = useState([]);
@@ -77,12 +77,14 @@ const ShowMedia = ({navigation}) => {
         uploadPhotos(index + 1);
       } else {
         //once all photo is uploaded on server removing all file from folder  clean the async storage and local state
-
-        RNFS.unlink(RNFS.CachesDirectoryPath).then(() => {
-          setImagePreview(null);
-          setImageList([]);
-          removeAsync(ASYNC_KEYS.IMAGE_PATH_LIST);
-        });
+        ReactNativeBlobUtil.fs.unlink(ReactNativeBlobUtil.fs.dirs.CacheDir);
+        ReactNativeBlobUtil.fs
+          .unlink(`${ReactNativeBlobUtil.fs.dirs.SDCardApplicationDir}/private`)
+          .then(() => {
+            setImagePreview(null);
+            setImageList([]);
+            removeAsync(ASYNC_KEYS.IMAGE_PATH_LIST);
+          });
       }
     } else {
       Alert.alert('Upload Failed');
